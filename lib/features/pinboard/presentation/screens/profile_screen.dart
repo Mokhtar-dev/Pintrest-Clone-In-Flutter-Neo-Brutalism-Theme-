@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'edit_profile_screen.dart';
+
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
@@ -8,7 +10,7 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  int _currentNavIndex = 3; // Profile tab is active
+  final int _currentNavIndex = 3; // Profile tab is active
   int _selectedTab = 0; // 0: Boards, 1: Saved
 
   final List<Map<String, dynamic>> _boards = [
@@ -51,7 +53,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
           children: [
             // 1. Top App Bar
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16.0,
+                vertical: 12.0,
+              ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -62,7 +67,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       border: Border.all(color: Colors.white24),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Icon(Icons.grid_view_rounded, color: Color(0xFFB6FF00), size: 16),
+                    child: const Icon(
+                      Icons.grid_view_rounded,
+                      color: Color(0xFFB6FF00),
+                      size: 16,
+                    ),
                   ),
                   const Text(
                     'PIN / DROP',
@@ -84,12 +93,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         child: IconButton(
                           icon: const Stack(
                             children: [
-                              Icon(Icons.notifications_outlined, color: Colors.white, size: 20),
+                              Icon(
+                                Icons.notifications_outlined,
+                                color: Colors.white,
+                                size: 20,
+                              ),
                               Positioned(
                                 right: 0,
                                 top: 0,
-                                child: CircleAvatar(radius: 4, backgroundColor: Color(0xFFFF0055)),
-                              )
+                                child: CircleAvatar(
+                                  radius: 4,
+                                  backgroundColor: Color(0xFFFF0055),
+                                ),
+                              ),
                             ],
                           ),
                           onPressed: () {},
@@ -101,9 +117,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         height: 36,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          border: Border.all(color: const Color(0xFFB6FF00), width: 2),
+                          border: Border.all(
+                            color: const Color(0xFFB6FF00),
+                            width: 2,
+                          ),
                           image: const DecorationImage(
-                            image: NetworkImage('https://i.pravatar.cc/100?img=12'),
+                            image: NetworkImage(
+                              'https://i.pravatar.cc/100?img=12',
+                            ),
                             fit: BoxFit.cover,
                           ),
                         ),
@@ -132,10 +153,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               width: 80,
                               height: 80,
                               decoration: BoxDecoration(
-                                border: Border.all(color: Colors.white24, width: 1.5),
+                                border: Border.all(
+                                  color: Colors.white24,
+                                  width: 1.5,
+                                ),
                                 borderRadius: BorderRadius.circular(12),
                                 image: const DecorationImage(
-                                  image: NetworkImage('https://i.pravatar.cc/200?img=12'),
+                                  image: NetworkImage(
+                                    'https://i.pravatar.cc/200?img=12',
+                                  ),
                                   fit: BoxFit.cover,
                                 ),
                               ),
@@ -144,7 +170,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               bottom: 4,
                               left: 4,
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                  vertical: 2,
+                                ),
                                 color: const Color(0xFFFFF500),
                                 child: const Text(
                                   '★ ONLINE',
@@ -175,7 +204,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     ),
                                   ),
                                   const SizedBox(width: 6),
-                                  const Icon(Icons.verified, color: Color(0xFFB6FF00), size: 16),
+                                  const Icon(
+                                    Icons.verified,
+                                    color: Color(0xFFB6FF00),
+                                    size: 16,
+                                  ),
                                 ],
                               ),
                               const SizedBox(height: 2),
@@ -191,7 +224,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               const SizedBox(height: 6),
                               const Text(
                                 'Visual collector & graphic designer. Hoarding type specimens & chrom...',
-                                style: TextStyle(color: Colors.white70, fontSize: 11, height: 1.3),
+                                style: TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 11,
+                                  height: 1.3,
+                                ),
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -205,11 +242,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     // 3. Stats Metric Boxes Row
                     Row(
                       children: [
-                        Expanded(child: _buildStatBox('142', 'PINS', const Color(0xFFFFF500))),
+                        Expanded(
+                          child: _buildStatBox(
+                            '142',
+                            'PINS',
+                            const Color(0xFFFFF500),
+                          ),
+                        ),
                         const SizedBox(width: 8),
-                        Expanded(child: _buildStatBox('18', 'BOARDS', const Color(0xFFB6FF00))),
+                        Expanded(
+                          child: _buildStatBox(
+                            '18',
+                            'BOARDS',
+                            const Color(0xFFB6FF00),
+                          ),
+                        ),
                         const SizedBox(width: 8),
-                        Expanded(child: _buildStatBox('12.4K', 'SAVES', const Color(0xFFFF0055))),
+                        Expanded(
+                          child: _buildStatBox(
+                            '12.4K',
+                            'SAVES',
+                            const Color(0xFFFF0055),
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 16),
@@ -223,16 +278,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             style: OutlinedButton.styleFrom(
                               foregroundColor: Colors.white,
                               backgroundColor: const Color(0xFF161A18),
-                              side: const BorderSide(color: Colors.white24, width: 1.5),
+                              side: const BorderSide(
+                                color: Colors.white24,
+                                width: 1.5,
+                              ),
                               padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
                             ),
-                            icon: const Icon(Icons.tune, color: Color(0xFFB6FF00), size: 16),
+                            icon: const Icon(
+                              Icons.tune,
+                              color: Color(0xFFB6FF00),
+                              size: 16,
+                            ),
                             label: const Text(
                               'EDIT PROFILE',
-                              style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 1.0),
+                              style: TextStyle(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 11,
+                                letterSpacing: 1.0,
+                              ),
                             ),
-                            onPressed: () {},
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      const EditProfileScreen(),
+                                ),
+                              );
+                            },
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -240,11 +316,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           child: Container(
                             decoration: BoxDecoration(
                               color: const Color(0xFF161A18),
-                              border: Border.all(color: Colors.white24, width: 1.5),
+                              border: Border.all(
+                                color: Colors.white24,
+                                width: 1.5,
+                              ),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: IconButton(
-                              icon: const Icon(Icons.share_outlined, color: Colors.white, size: 18),
+                              icon: const Icon(
+                                Icons.share_outlined,
+                                color: Colors.white,
+                                size: 18,
+                              ),
                               onPressed: () {},
                             ),
                           ),
@@ -254,11 +337,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           child: Container(
                             decoration: BoxDecoration(
                               color: const Color(0xFF161A18),
-                              border: Border.all(color: Colors.white24, width: 1.5),
+                              border: Border.all(
+                                color: Colors.white24,
+                                width: 1.5,
+                              ),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: IconButton(
-                              icon: const Icon(Icons.more_horiz, color: Colors.white, size: 18),
+                              icon: const Icon(
+                                Icons.more_horiz,
+                                color: Colors.white,
+                                size: 18,
+                              ),
                               onPressed: () {},
                             ),
                           ),
@@ -276,9 +366,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             child: Container(
                               padding: const EdgeInsets.symmetric(vertical: 10),
                               decoration: BoxDecoration(
-                                color: _selectedTab == 0 ? const Color(0xFF161A18) : Colors.transparent,
+                                color: _selectedTab == 0
+                                    ? const Color(0xFF161A18)
+                                    : Colors.transparent,
                                 border: Border.all(
-                                  color: _selectedTab == 0 ? const Color(0xFFB6FF00) : Colors.white24,
+                                  color: _selectedTab == 0
+                                      ? const Color(0xFFB6FF00)
+                                      : Colors.white24,
                                   width: 1.5,
                                 ),
                                 borderRadius: BorderRadius.circular(8),
@@ -287,7 +381,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 child: Text(
                                   'BOARDS (18)',
                                   style: TextStyle(
-                                    color: _selectedTab == 0 ? Colors.white : Colors.white54,
+                                    color: _selectedTab == 0
+                                        ? Colors.white
+                                        : Colors.white54,
                                     fontWeight: FontWeight.w900,
                                     fontSize: 11,
                                     letterSpacing: 1.0,
@@ -304,9 +400,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             child: Container(
                               padding: const EdgeInsets.symmetric(vertical: 10),
                               decoration: BoxDecoration(
-                                color: _selectedTab == 1 ? const Color(0xFF161A18) : Colors.transparent,
+                                color: _selectedTab == 1
+                                    ? const Color(0xFF161A18)
+                                    : Colors.transparent,
                                 border: Border.all(
-                                  color: _selectedTab == 1 ? const Color(0xFFB6FF00) : Colors.white24,
+                                  color: _selectedTab == 1
+                                      ? const Color(0xFFB6FF00)
+                                      : Colors.white24,
                                   width: 1.5,
                                 ),
                                 borderRadius: BorderRadius.circular(8),
@@ -315,7 +415,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 child: Text(
                                   'SAVED (142)',
                                   style: TextStyle(
-                                    color: _selectedTab == 1 ? Colors.white : Colors.white54,
+                                    color: _selectedTab == 1
+                                        ? Colors.white
+                                        : Colors.white54,
                                     fontWeight: FontWeight.w900,
                                     fontSize: 11,
                                     letterSpacing: 1.0,
@@ -334,19 +436,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
                       itemCount: _boards.length,
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        crossAxisSpacing: 12,
-                        mainAxisSpacing: 12,
-                        childAspectRatio: 0.85,
-                      ),
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            crossAxisSpacing: 12,
+                            mainAxisSpacing: 12,
+                            childAspectRatio: 0.85,
+                          ),
                       itemBuilder: (context, index) {
                         final board = _boards[index];
                         return Container(
                           decoration: BoxDecoration(
                             color: const Color(0xFF161A18),
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.white24, width: 1.5),
+                            border: Border.all(
+                              color: Colors.white24,
+                              width: 1.5,
+                            ),
                           ),
                           clipBehavior: Clip.antiAlias,
                           child: Column(
@@ -365,10 +471,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                       top: 8,
                                       left: 8,
                                       child: Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 6,
+                                          vertical: 3,
+                                        ),
                                         decoration: BoxDecoration(
                                           color: board['statusColor'],
-                                          border: Border.all(color: Colors.black, width: 1),
+                                          border: Border.all(
+                                            color: Colors.black,
+                                            width: 1,
+                                          ),
                                         ),
                                         child: Text(
                                           board['status'],
@@ -431,7 +543,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               color: const Color(0xFFB6FF00),
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: const Icon(Icons.add, color: Colors.black, size: 22),
+                            child: const Icon(
+                              Icons.add,
+                              color: Colors.black,
+                              size: 22,
+                            ),
                           ),
                           const SizedBox(width: 14),
                           const Expanded(
@@ -465,7 +581,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               border: Border.all(color: Colors.white24),
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: const Icon(Icons.arrow_forward, color: Colors.white, size: 16),
+                            child: const Icon(
+                              Icons.arrow_forward,
+                              color: Colors.white,
+                              size: 16,
+                            ),
                           ),
                         ],
                       ),
@@ -493,7 +613,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               ),
                             ),
                           ),
-                          const Icon(Icons.close, color: Colors.black, size: 16),
+                          const Icon(
+                            Icons.close,
+                            color: Colors.black,
+                            size: 16,
+                          ),
                         ],
                       ),
                     ),
@@ -505,8 +629,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ],
         ),
       ),
-
-    
     );
   }
 
@@ -542,5 +664,4 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
   }
-
 }
