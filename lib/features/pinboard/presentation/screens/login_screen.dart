@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../../../services/auth_service.dart';
+import '../widgets/neo_feedback.dart';
 import 'register_screen.dart';
-import 'home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -13,6 +14,7 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   bool _obscurePassword = true;
   bool _rememberMe = false;
+  bool _isLoading = false;
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
 
@@ -21,6 +23,121 @@ class _LoginScreenState extends State<LoginScreen> {
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _signIn() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
+    if (email.isEmpty || password.isEmpty) {
+      showNeoTip(context, 'ACCESS DENIED // FILL ALL FIELDS');
+      return;
+    }
+    if (!email.contains('@')) {
+      showNeoTip(context, 'MALFORMED EMAIL LINE // CHECK ADDRESS');
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    try {
+      await AuthService.instance.signIn(email: email, password: password);
+      // AuthGate listens to authStateChanges() and swaps to HomeScreen.
+    } catch (error) {
+      if (mounted) {
+        showNeoTip(context, AuthService.friendlyError(error));
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _showResetDialog() async {
+    final resetController = TextEditingController(text: _emailController.text);
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: kNeoPanel,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: const BorderSide(color: kNeoLime, width: 1.5),
+          ),
+          title: const Text(
+            'RESET ACCESS',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w900,
+              fontSize: 15,
+              letterSpacing: 1.2,
+            ),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'ENTER REGISTERED EMAIL TO RECEIVE A RESET LINK.',
+                style: TextStyle(color: Colors.white54, fontSize: 10),
+              ),
+              const SizedBox(height: 12),
+              neoTextField(
+                controller: resetController,
+                hint: 'operator@pindrop.io',
+                autofocus: true,
+                keyboardType: TextInputType.emailAddress,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text(
+                'CANCEL',
+                style: TextStyle(
+                  color: Colors.white54,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 11,
+                ),
+              ),
+            ),
+            GestureDetector(
+              onTap: () async {
+                final email = resetController.text.trim();
+                if (email.isEmpty) return;
+                Navigator.pop(dialogContext);
+                try {
+                  await AuthService.instance.sendPasswordReset(email);
+                  if (mounted) {
+                    showNeoTip(context, 'RESET LINK TRANSMITTED // CHECK INBOX');
+                  }
+                } catch (error) {
+                  if (mounted) {
+                    showNeoTip(context, AuthService.friendlyError(error));
+                  }
+                }
+              },
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(
+                  color: kNeoLime,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Text(
+                  'SEND LINK',
+                  style: TextStyle(
+                    color: Colors.black,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 11,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+    resetController.dispose();
   }
 
   @override
@@ -50,7 +167,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         color: Colors.white,
                         size: 18,
                       ),
-                      onPressed: () {},
+                      onPressed: () => Navigator.maybePop(context),
                     ),
                   ),
                   // Title Branding
@@ -202,6 +319,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 child: TextField(
                   controller: _emailController,
+                  keyboardType: TextInputType.emailAddress,
+                  autocorrect: false,
                   style: const TextStyle(color: Colors.white, fontSize: 14),
                   decoration: const InputDecoration(
                     hintText: 'operator@pindrop.io',
@@ -303,7 +422,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ],
                   ),
                   TextButton(
-                    onPressed: () {},
+                    onPressed: _showResetDialog,
                     child: const Text(
                       'Forgot password?',
                       style: TextStyle(
@@ -328,30 +447,31 @@ class _LoginScreenState extends State<LoginScreen> {
                     borderRadius: BorderRadius.circular(16),
                   ),
                 ),
-                onPressed: () {
-                  // Navigate to DashboardScreen and remove Login from the navigation stack
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const HomeScreen(),
-                    ),
-                  );
-                },
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      'LOG IN',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w900,
-                        fontSize: 15,
-                        letterSpacing: 1.2,
+                onPressed: _isLoading ? null : _signIn,
+                child: _isLoading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.black,
+                        ),
+                      )
+                    : const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            'LOG IN',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 15,
+                              letterSpacing: 1.2,
+                            ),
+                          ),
+                          SizedBox(width: 8),
+                          Icon(Icons.arrow_forward_rounded, size: 18),
+                        ],
                       ),
-                    ),
-                    SizedBox(width: 8),
-                    Icon(Icons.arrow_forward_rounded, size: 18),
-                  ],
-                ),
               ),
               const SizedBox(height: 28),
 
@@ -392,7 +512,10 @@ class _LoginScreenState extends State<LoginScreen> {
                           borderRadius: BorderRadius.circular(16),
                         ),
                       ),
-                      onPressed: () {},
+                      onPressed: () => showNeoTip(
+                        context,
+                        'OAUTH UPLINK NOT CONFIGURED // USE EMAIL ACCESS',
+                      ),
                       child: const Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -424,7 +547,10 @@ class _LoginScreenState extends State<LoginScreen> {
                           borderRadius: BorderRadius.circular(16),
                         ),
                       ),
-                      onPressed: () {},
+                      onPressed: () => showNeoTip(
+                        context,
+                        'OAUTH UPLINK NOT CONFIGURED // USE EMAIL ACCESS',
+                      ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [

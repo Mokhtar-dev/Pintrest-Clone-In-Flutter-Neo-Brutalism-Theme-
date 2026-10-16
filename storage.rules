@@ -1,0 +1,26 @@
+rules_version = '2';
+
+// PIN / DROP - Firebase Storage security rules.
+// Deploy with: firebase deploy --only storage
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Avatars: readable by all, writable only by their owner (avatars/{uid}.jpg).
+    match /avatars/{fileName} {
+      allow read: if true;
+      allow write: if request.auth != null
+                   && fileName.split('.')[0] == request.auth.uid
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+    }
+
+    // Pin images: readable by all, owner-only writes (pins/{uid}/...).
+    match /pins/{uid}/{fileName} {
+      allow read: if true;
+      allow write: if request.auth != null
+                   && request.auth.uid == uid
+                   && request.resource.size < 10 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+    }
+  }
+}

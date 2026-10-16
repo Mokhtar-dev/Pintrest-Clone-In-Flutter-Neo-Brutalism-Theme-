@@ -1,0 +1,78 @@
+rules_version = '2';
+
+// PIN / DROP - Firestore security rules.
+// Deploy with: firebase deploy --only firestore:rules
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    // Operator profiles: everyone signed in can read, only the owner writes.
+    match /users/{uid} {
+      allow read: if signedIn();
+      allow create, update: if isOwner(uid);
+      allow delete: if false;
+
+      // Personal SAVED vault - private to the owner.
+      match /saved/{pinId} {
+        allow read, write: if isOwner(uid);
+      }
+
+      // Boards (moodboard vaults) - private to the owner for this demo scope.
+      match /boards/{boardId} {
+        allow read, write: if isOwner(uid);
+      }
+
+      // Live feed notifications - private to the recipient.
+      match /notifications/{notificationId} {
+        allow read, write: if isOwner(uid);
+      }
+
+      // Follow graph subcollections.
+      match /followers/{followerId} {
+        allow read: if signedIn();
+        allow create, delete: if isOwner(followerId);
+      }
+      match /following/{followedId} {
+        allow read: if signedIn();
+        allow create, delete: if isOwner(uid);
+      }
+    }
+
+    // Pins: world readable to signed in users, author-only destructive writes.
+    match /pins/{pinId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+                    && request.resource.data.authorId == request.auth.uid;
+      // Any signed in user may like/save/comment (counter increments).
+      allow update: if signedIn();
+      allow delete: if signedIn()
+                    && resource.data.authorId == request.auth.uid;
+
+      match /likes/{likeId} {
+        allow read: if signedIn();
+        allow create, delete: if isOwner(likeId);
+      }
+
+      match /savedBy/{saverId} {
+        allow read: if signedIn();
+        allow create: if isOwner(saverId);
+        allow delete: if isOwner(saverId);
+      }
+
+      match /comments/{commentId} {
+        allow read: if signedIn();
+        allow create: if signedIn()
+                      && request.resource.data.authorId == request.auth.uid;
+        allow delete: if signedIn()
+                      && resource.data.authorId == request.auth.uid;
+      }
+    }
+  }
+}

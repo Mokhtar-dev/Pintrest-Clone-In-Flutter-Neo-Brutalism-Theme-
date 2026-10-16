@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+
+import 'upload_screen.dart';
 
 class AddImageScreen extends StatefulWidget {
   const AddImageScreen({super.key});
@@ -10,6 +13,22 @@ class AddImageScreen extends StatefulWidget {
 class _AddImageScreenState extends State<AddImageScreen> {
   int _selectedRatio = 0; // 0: 3:4, 1: 1:1, 2: 9:16
   int _selectedAssetIndex = 0;
+
+  /// Opens the device gallery and forwards the chosen asset to the final
+  /// metadata step (UploadScreen) where it is pushed to Firebase Storage.
+  Future<void> _continueWithDeviceImage() async {
+    final file = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 88,
+    );
+    if (file == null || !mounted) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => UploadScreen(initialImage: file),
+      ),
+    );
+  }
 
   final List<String> _galleryAssets = [
     'https://images.unsplash.com/photo-1550745165-9bc0b252726f',
@@ -58,9 +77,7 @@ class _AddImageScreenState extends State<AddImageScreen> {
                             borderRadius: BorderRadius.circular(4),
                           ),
                         ),
-                        onPressed: () {
-                          // TODO: Proceed to final metadata input / upload
-                        },
+                        onPressed: _continueWithDeviceImage,
                         child: const Text(
                           'NEXT (1) →',
                           style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12),
@@ -281,18 +298,21 @@ class _AddImageScreenState extends State<AddImageScreen> {
                   itemCount: _galleryAssets.length + 1,
                   itemBuilder: (context, index) {
                     if (index == 0) {
-                      return Container(
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF161A18),
-                          border: Border.all(color: Colors.white24),
-                        ),
-                        child: const Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.videocam_outlined, color: Colors.white, size: 24),
-                            SizedBox(height: 4),
-                            Text('NEW SHOT\nREC // LIVE', textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w900, fontSize: 9)),
-                          ],
+                      return GestureDetector(
+                        onTap: _continueWithDeviceImage,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF161A18),
+                            border: Border.all(color: Colors.white24),
+                          ),
+                          child: const Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.videocam_outlined, color: Colors.white, size: 24),
+                              SizedBox(height: 4),
+                              Text('NEW SHOT\nREC // LIVE', textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w900, fontSize: 9)),
+                            ],
+                          ),
                         ),
                       );
                     }
@@ -365,7 +385,7 @@ class _AddImageScreenState extends State<AddImageScreen> {
                       elevation: 0,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
                     ),
-                    onPressed: () {},
+                    onPressed: _continueWithDeviceImage,
                     child: const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [

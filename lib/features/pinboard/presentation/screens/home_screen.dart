@@ -1,10 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 
+import '../../../../services/auth_service.dart';
+import '../../../../services/notification_service.dart';
+import '../../../../services/pin_service.dart';
+import '../../../../services/user_service.dart';
+import '../../domain/entities/app_user.dart';
+import '../../domain/entities/pin.dart';
+import '../widgets/neo_feedback.dart';
+import '../widgets/pin_card.dart';
 import 'add_image_screen.dart';
+import 'explore_screen.dart';
 import 'image_details_screen.dart';
-import 'profile_screen.dart';
 import 'notifications_screen.dart';
+import 'profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -15,92 +25,217 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _currentNavIndex = 0; // 0: Home, 1: Explore, 2: Notifications, 3: Profile
+  int _selectedCategoryIndex = 0;
 
-  final List<Map<String, dynamic>> _categories = [
-    {'label': 'ALL', 'selected': true},
-    {'label': 'ACID GRAPHICS', 'selected': false},
-    {'label': '3D CLAY', 'selected': false},
-    {'label': 'RAW TYPOGRAPHY', 'selected': false},
+  final List<String> _categories = [
+    'ALL',
+    'ACID GRAPHICS',
+    '3D CLAY',
+    'RAW TYPOGRAPHY',
   ];
 
-  final List<Map<String, dynamic>> _pins = [
-    {
-      'title': 'SYSTEM MATRIX 04',
-      'category': 'POSTER // GRID',
-      'author': '@studio_ke_',
-      'saves': '1.4K',
-      'badge': 'SPARK ★',
-      'badgeColor': const Color(0xFFFFF500),
-      'image': 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23',
-      'height': 240.0,
-    },
-    {
-      'title': 'MERCURY SPHERE',
-      'category': '3D CHROME',
-      'author': '@acid_vault',
-      'saves': '890',
-      'badge': 'CHROME LOVE',
-      'badgeColor': const Color(0xFFFF0055),
-      'image': 'https://images.unsplash.com/photo-1550745165-9bc0b252726f',
-      'height': 190.0,
-    },
-    {
-      'title': 'MONOLITH BUNKER 9',
-      'category': 'INTERIOR ARCH',
-      'author': '@archidrop',
-      'saves': '2.1K',
-      'badge': 'BRUTAL_SPACE',
-      'badgeColor': const Color(0xFF00E5FF),
-      'image': 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5',
-      'height': 260.0,
-    },
-    {
-      'title': 'FLORA OVERLAY 09',
-      'category': 'RISO // PRINT',
-      'author': '@risolab',
-      'saves': '3.8K',
-      'badge': 'NEW DROP',
-      'badgeColor': const Color(0xFFB6FF00),
-      'image': 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe',
-      'height': 210.0,
-    },
-  ];
+  String get _uid => AuthService.instance.currentUid;
 
-  // Placeholder views for Explore & Notifications until you build them
-  Widget _buildPlaceholderScreen(String title, IconData icon) {
-    return Center(
+  @override
+  void initState() {
+    super.initState();
+    // Populate the showcase drops once on an empty project so the feed keeps
+    // the original design look. Safe no-op when pins already exist.
+    PinService.instance.seedSamplePinsIfEmpty();
+  }
+
+  // Fetches the latest profile of the signed in operator before an action so
+  // notifications always carry fresh name/avatar data.
+  Future<void> _withMe(Future<void> Function(AppUser me) action) async {
+    final me = await UserService.instance.getUser(_uid);
+    if (me == null) {
+      if (mounted) showNeoTip(context, 'PROFILE LINK LOST // RE-AUTHENTICATE');
+      return;
+    }
+    await action(me);
+  }
+
+  Future<void> _toggleLike(Pin pin) async {
+    await _withMe((me) async {
+      final liked = await PinService.instance.toggleLike(
+        pin: pin,
+        uid: me.uid,
+        actorName: me.name,
+        actorUsername: me.username,
+        actorAvatarUrl: me.avatarUrl,
+      );
+      if (mounted && liked) {
+        showNeoTip(context, 'LIKE REGISTERED // ${pin.title}');
+      }
+    });
+  }
+
+  Future<void> _savePin(Pin pin) async {
+    await _withMe((me) async {
+      final saved = await PinService.instance.savePinToSaved(
+        pin: pin,
+        uid: me.uid,
+        actorName: me.name,
+        actorUsername: me.username,
+        actorAvatarUrl: me.avatarUrl,
+      );
+      if (mounted) {
+        showNeoTip(
+          context,
+          saved ? 'DROPPED TO SAVED VAULT' : 'ALREADY IN SAVED VAULT',
+        );
+      }
+    });
+  }
+
+  void _showPinOptions(Pin pin) {
+    final isOwner = pin.authorId == _uid;
+    showNeoSheet<void>(
+      context,
+      title: 'DROP CONTROLS // ${pin.title}',
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: const Color(0xFFB6FF00), size: 48),
-          const SizedBox(height: 12),
-          Text(
-            title,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w900,
-              fontSize: 18,
-              letterSpacing: 1.2,
+          _sheetAction(
+            icon: Icons.link,
+            label: 'COPY LINK',
+            onTap: () async {
+              Navigator.pop(context);
+              await Clipboard.setData(
+                ClipboardData(
+                  text: 'https://pin-drop-b2e4d.web.app/pin/${pin.id}',
+                ),
+              );
+              if (mounted) showNeoTip(context, 'LINK COPIED TO CLIPBOARD');
+            },
+          ),
+          const SizedBox(height: 8),
+          if (isOwner)
+            _sheetAction(
+              icon: Icons.delete_outline,
+              label: 'DELETE DROP',
+              tint: kNeoRed,
+              onTap: () async {
+                Navigator.pop(context);
+                final confirm = await _confirmDelete(pin);
+                if (confirm) {
+                  await PinService.instance.deletePin(pin);
+                  if (mounted) showNeoTip(context, 'DROP PURGED FROM GRID');
+                }
+              },
+            )
+          else
+            _sheetAction(
+              icon: Icons.flag_outlined,
+              label: 'REPORT DROP',
+              tint: kNeoYellow,
+              onTap: () {
+                Navigator.pop(context);
+                showNeoTip(context, 'REPORT DISPATCHED TO CONTROL');
+              },
             ),
-          ),
-          const SizedBox(height: 6),
-          const Text(
-            'SYSTEM MODULE INITIALIZING...',
-            style: TextStyle(color: Colors.white38, fontSize: 11),
-          ),
         ],
       ),
     );
   }
 
+  Future<bool> _confirmDelete(Pin pin) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: kNeoPanel,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: kNeoRed, width: 1.5),
+        ),
+        title: const Text(
+          'PURGE DROP?',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w900,
+            fontSize: 15,
+            letterSpacing: 1.2,
+          ),
+        ),
+        content: Text(
+          '${pin.title} WILL BE REMOVED FROM THE GRID PERMANENTLY.',
+          style: const TextStyle(color: Colors.white54, fontSize: 11),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text(
+              'CANCEL',
+              style: TextStyle(
+                color: Colors.white54,
+                fontWeight: FontWeight.w900,
+                fontSize: 11,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text(
+              'DELETE',
+              style: TextStyle(
+                color: kNeoRed,
+                fontWeight: FontWeight.w900,
+                fontSize: 11,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
+  }
+
+  Widget _sheetAction({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    Color tint = Colors.white,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        decoration: BoxDecoration(
+          color: kNeoBlack,
+          border: Border.all(color: Colors.white24, width: 1.5),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: tint, size: 16),
+            const SizedBox(width: 10),
+            Text(
+              label,
+              style: TextStyle(
+                color: tint,
+                fontWeight: FontWeight.w900,
+                fontSize: 11,
+                letterSpacing: 1.0,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
-  Widget build(BuildContext context) { //? this one holds the page's indices 
+  Widget build(BuildContext context) {
     // List of page bodies mapping directly to index [0, 1, 2, 3]
     final List<Widget> pages = [
       _buildHomeFeedView(), // Index 0: Home / Feed
-      _buildPlaceholderScreen('EXPLORE DATABASE', Icons.explore_outlined), // Index 1: Explore (Plug your ExploreScreen here later)
-      const NotificationsScreen(), // Index 2: Notifications (Plug your NotificationsScreen here later)
-      const ProfileScreen(), // Index 3: Profile Screen
+      const ExploreScreen(), // Index 1: Explore / Search
+      const NotificationsScreen(), // Index 2: Notifications
+      ProfileScreen(
+        // Index 3: Profile Screen (bell icon jumps to the notifications tab)
+        onOpenNotifications: () => setState(() => _currentNavIndex = 2),
+      ),
     ];
 
     return Scaffold(
@@ -197,44 +332,63 @@ class _HomeScreenState extends State<HomeScreen> {
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: IconButton(
-                      icon: const Stack(
-                        children: [
-                          Icon(
-                            Icons.notifications_outlined,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                          Positioned(
-                            right: 0,
-                            top: 0,
-                            child: CircleAvatar(
-                              radius: 4,
-                              backgroundColor: Color(0xFFFF0055),
-                            ),
-                          ),
-                        ],
+                      icon: StreamBuilder<int>(
+                        stream: NotificationService.instance
+                            .streamUnreadCount(_uid),
+                        builder: (context, snapshot) {
+                          final unread = snapshot.data ?? 0;
+                          return Stack(
+                            children: [
+                              const Icon(
+                                Icons.notifications_outlined,
+                                color: Colors.white,
+                                size: 20,
+                              ),
+                              if (unread > 0)
+                                const Positioned(
+                                  right: 0,
+                                  top: 0,
+                                  child: CircleAvatar(
+                                    radius: 4,
+                                    backgroundColor: Color(0xFFFF0055),
+                                  ),
+                                ),
+                            ],
+                          );
+                        },
                       ),
-                      onPressed: () => setState(() => _currentNavIndex = 2), // Swaps to Notifications tab
+                      onPressed: () =>
+                          setState(() => _currentNavIndex = 2), // Swaps to Notifications tab
                     ),
                   ),
                   const SizedBox(width: 10),
-                  GestureDetector(
-                    onTap: () => setState(() => _currentNavIndex = 3), // Swaps to Profile tab
-                    child: Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: const Color(0xFFB6FF00),
-                          width: 2,
+                  StreamBuilder<AppUser?>(
+                    stream: UserService.instance.streamUser(_uid),
+                    builder: (context, snapshot) {
+                      final avatarUrl = snapshot.data?.avatarUrl ?? '';
+                      return GestureDetector(
+                        onTap: () => setState(
+                            () => _currentNavIndex = 3), // Swaps to Profile tab
+                        child: Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: const Color(0xFFB6FF00),
+                              width: 2,
+                            ),
+                            color: const Color(0xFF161A18),
+                            image: avatarUrl.isEmpty
+                                ? null
+                                : DecorationImage(
+                                    image: NetworkImage(avatarUrl),
+                                    fit: BoxFit.cover,
+                                  ),
+                          ),
                         ),
-                        image: const DecorationImage(
-                          image: NetworkImage('https://i.pravatar.cc/100'),
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                    ),
+                      );
+                    },
                   ),
                 ],
               ),
@@ -250,26 +404,31 @@ class _HomeScreenState extends State<HomeScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             itemCount: _categories.length,
             itemBuilder: (context, index) {
-              final cat = _categories[index];
-              final isSelected = cat['selected'] as bool;
-              return Container(
-                margin: const EdgeInsets.only(right: 8),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                decoration: BoxDecoration(
-                  color: isSelected ? const Color(0xFFB6FF00) : const Color(0xFF161A18),
-                  border: Border.all(
-                    color: isSelected ? Colors.black : Colors.white24,
-                    width: 1.5,
+              final isSelected = _selectedCategoryIndex == index;
+              return GestureDetector(
+                onTap: () => setState(() => _selectedCategoryIndex = index),
+                child: Container(
+                  margin: const EdgeInsets.only(right: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? const Color(0xFFB6FF00)
+                        : const Color(0xFF161A18),
+                    border: Border.all(
+                      color: isSelected ? Colors.black : Colors.white24,
+                      width: 1.5,
+                    ),
+                    borderRadius: BorderRadius.circular(6),
                   ),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  cat['label'],
-                  style: TextStyle(
-                    color: isSelected ? Colors.black : Colors.white70,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 11,
-                    letterSpacing: 0.8,
+                  child: Text(
+                    _categories[index],
+                    style: TextStyle(
+                      color: isSelected ? Colors.black : Colors.white70,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 11,
+                      letterSpacing: 0.8,
+                    ),
                   ),
                 ),
               );
@@ -325,190 +484,75 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         const SizedBox(height: 12),
 
-        // 4. Staggered Masonry Grid Feed
+        // 4. Staggered Masonry Grid Feed (live Firestore stream)
         Expanded(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: MasonryGridView.count(
-              crossAxisCount: 2,
-              mainAxisSpacing: 12,
-              crossAxisSpacing: 12,
-              itemCount: _pins.length,
-              itemBuilder: (context, index) {
-                final pin = _pins[index];
-                return GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const ImageDetailsScreen(),
-                      ),
-                    );
-                  },
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF161A18),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.white24, width: 1.5),
-                    ),
-                    clipBehavior: Clip.antiAlias,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Stack(
-                          children: [
-                            Image.network(
-                              pin['image'],
-                              height: pin['height'],
-                              width: double.infinity,
-                              fit: BoxFit.cover,
-                            ),
-                            Positioned(
-                              top: 8,
-                              left: 8,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: pin['badgeColor'],
-                                  border: Border.all(color: Colors.black, width: 1),
-                                ),
-                                child: Text(
-                                  pin['badge'],
-                                  style: const TextStyle(
-                                    color: Colors.black,
-                                    fontWeight: FontWeight.w900,
-                                    fontSize: 9,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            Positioned(
-                              top: 8,
-                              right: 8,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFB6FF00),
-                                  border: Border.all(color: Colors.black, width: 1),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: const Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(Icons.bookmark_border, size: 12, color: Colors.black),
-                                    SizedBox(width: 2),
-                                    Text(
-                                      'SAVE',
-                                      style: TextStyle(
-                                        color: Colors.black,
-                                        fontWeight: FontWeight.w900,
-                                        fontSize: 9,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.all(10.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      pin['category'],
-                                      style: const TextStyle(
-                                        color: Color(0xFFFF0055),
-                                        fontSize: 9,
-                                        fontWeight: FontWeight.w900,
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                  Row(
-                                    children: [
-                                      const Icon(Icons.bookmark_outline, size: 10, color: Color(0xFFB6FF00)),
-                                      const SizedBox(width: 2),
-                                      Text(
-                                        pin['saves'],
-                                        style: const TextStyle(
-                                          color: Colors.white70,
-                                          fontSize: 9,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                pin['title'],
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: 12,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                                    decoration: BoxDecoration(
-                                      color: Colors.black,
-                                      border: Border.all(color: Colors.white24),
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Text(
-                                      pin['author'],
-                                      style: const TextStyle(
-                                        color: Colors.white70,
-                                        fontSize: 9,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                  Row(
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.all(4),
-                                        decoration: BoxDecoration(
-                                          color: Colors.black,
-                                          border: Border.all(color: Colors.white24),
-                                          borderRadius: BorderRadius.circular(4),
-                                        ),
-                                        child: const Icon(Icons.favorite_border, color: Colors.white, size: 12),
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Container(
-                                        padding: const EdgeInsets.all(4),
-                                        decoration: BoxDecoration(
-                                          color: Colors.black,
-                                          border: Border.all(color: Colors.white24),
-                                          borderRadius: BorderRadius.circular(4),
-                                        ),
-                                        child: const Icon(Icons.more_horiz, color: Colors.white, size: 12),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+          child: StreamBuilder<List<Pin>>(
+            stream: PinService.instance.streamPins(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const NeoEmptyState(
+                  title: 'PULLING FRESH DROPS',
+                  subtitle: 'SYSTEM MODULE INITIALIZING...',
                 );
-              },
-            ),
+              }
+              if (snapshot.hasError) {
+                return const NeoEmptyState(
+                  icon: Icons.wifi_off,
+                  title: 'STREAM OFFLINE',
+                  subtitle: 'CHECK NETWORK UPLINK AND RETRY',
+                );
+              }
+              final allPins = snapshot.data ?? const <Pin>[];
+              final pins = _selectedCategoryIndex == 0
+                  ? allPins
+                  : allPins
+                      .where((pin) =>
+                          pin.category ==
+                          _categories[_selectedCategoryIndex])
+                      .toList();
+
+              if (pins.isEmpty) {
+                return NeoEmptyState(
+                  icon: Icons.grid_view_rounded,
+                  title: 'NO DROPS IN THIS CHANNEL',
+                  subtitle: 'TAP + TO UPLOAD THE FIRST DROP',
+                );
+              }
+
+              return RefreshIndicator(
+                color: const Color(0xFFB6FF00),
+                backgroundColor: const Color(0xFF161A18),
+                onRefresh: () =>
+                    Future<void>.delayed(const Duration(milliseconds: 600)),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  child: MasonryGridView.count(
+                    crossAxisCount: 2,
+                    mainAxisSpacing: 12,
+                    crossAxisSpacing: 12,
+                    itemCount: pins.length,
+                    itemBuilder: (context, index) {
+                      final pin = pins[index];
+                      return PinCard(
+                        pin: pin,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  ImageDetailsScreen(pin: pin),
+                            ),
+                          );
+                        },
+                        onSave: () => _savePin(pin),
+                        onLike: () => _toggleLike(pin),
+                        onMore: () => _showPinOptions(pin),
+                      );
+                    },
+                  ),
+                ),
+              );
+            },
           ),
         ),
 

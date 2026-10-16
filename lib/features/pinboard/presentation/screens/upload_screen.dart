@@ -1,26 +1,108 @@
-import 'dart:io';
+import 'dart:typed_data';
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../../services/auth_service.dart';
+import '../../../../services/pin_service.dart';
+import '../../../../services/user_service.dart';
+import '../widgets/neo_feedback.dart';
+
 class UploadScreen extends StatefulWidget {
-  const UploadScreen({super.key});
+  /// Image selected on the previous step (AddImageScreen).
+  final XFile? initialImage;
+
+  const UploadScreen({super.key, this.initialImage});
 
   @override
   State<UploadScreen> createState() => _UploadScreenState();
 }
 
 class _UploadScreenState extends State<UploadScreen> {
-  File? _selectedImage;
   final ImagePicker _picker = ImagePicker();
   final TextEditingController _titleController = TextEditingController();
   bool _isButtonPressed = false;
+  bool _publishing = false;
+  Uint8List? _imageBytes;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialImage != null) {
+      _loadBytes(widget.initialImage!);
+    }
+  }
+
+  Future<void> _loadBytes(XFile file) async {
+    try {
+      final bytes = await file.readAsBytes();
+      if (!mounted) return;
+      setState(() => _imageBytes = bytes);
+    } catch (_) {
+      if (mounted) showNeoTip(context, 'MEDIA READ FAULT // RESELECT ASSET');
+    }
+  }
 
   Future<void> _pickImage() async {
-    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
-    if (image != null) {
-      setState(() {
-        _selectedImage = File(image.path);
-      });
+    final image = await _picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 88,
+    );
+    if (image == null) return;
+    await _loadBytes(image);
+  }
+
+  Future<double> _decodeAspectRatio(Uint8List bytes) async {
+    try {
+      final codec = await ui.instantiateImageCodec(bytes);
+      final frame = await codec.getNextFrame();
+      final image = frame.image;
+      final ratio = image.height == 0 ? 0.75 : image.width / image.height;
+      image.dispose();
+      codec.dispose();
+      return ratio;
+    } catch (_) {
+      return 0.75;
+    }
+  }
+
+  Future<void> _publish() async {
+    if (_imageBytes == null) {
+      showNeoTip(context, 'SELECT A MEDIA ASSET FIRST');
+      return;
+    }
+    if (_titleController.text.trim().isEmpty) {
+      showNeoTip(context, 'PIN TITLE REQUIRED');
+      return;
+    }
+
+    setState(() => _publishing = true);
+    try {
+      final uid = AuthService.instance.currentUid;
+      final me = await UserService.instance.getUser(uid);
+      if (me == null) {
+        if (mounted) showNeoTip(context, 'PROFILE LINK LOST // RE-AUTHENTICATE');
+        return;
+      }
+      final aspectRatio = await _decodeAspectRatio(_imageBytes!);
+
+      await PinService.instance.createPin(
+        bytes: _imageBytes!,
+        title: _titleController.text,
+        description: '',
+        aspectRatio: aspectRatio,
+        author: me,
+      );
+
+      if (!mounted) return;
+      showNeoTip(context, 'DROP PUBLISHED // LIVE ON THE GRID');
+      // Back to the feed.
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    } catch (_) {
+      if (mounted) showNeoTip(context, 'UPLOAD FAULT // CHECK CONNECTION');
+    } finally {
+      if (mounted) setState(() => _publishing = false);
     }
   }
 
@@ -123,7 +205,7 @@ class _UploadScreenState extends State<UploadScreen> {
                       ),
                     ],
                   ),
-                  child: _selectedImage == null
+                  child: _imageBytes == null
                       ? Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
@@ -153,8 +235,8 @@ class _UploadScreenState extends State<UploadScreen> {
                       : Stack(
                           fit: StackFit.expand,
                           children: [
-                            Image.file(
-                              _selectedImage!,
+                            Image.memory(
+                              _imageBytes!,
                               fit: BoxFit.cover,
                             ),
                             Positioned(
@@ -190,26 +272,20 @@ class _UploadScreenState extends State<UploadScreen> {
 
               // Tactile Press Button Component
               GestureDetector(
-                onTapDown: (_) => setState(() => _isButtonPressed = true),
-                onTapUp: (_) {
-                  setState(() => _isButtonPressed = false);
-                  if (_selectedImage == null) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Please select an image first!'),
-                      ),
-                    );
-                    return;
+                onTapDown: _publishing
+                    ? null
+                    : (_) => setState(() => _isButtonPressed = true),
+                onTapUp: _publishing
+                    ? null
+                    : (_) {
+                        setState(() => _isButtonPressed = false);
+                        _publish();
+                      },
+                onTapCancel: () {
+                  if (!_publishing) {
+                    setState(() => _isButtonPressed = false);
                   }
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        'Ready to upload: "${_titleController.text}"',
-                      ),
-                    ),
-                  );
                 },
-                onTapCancel: () => setState(() => _isButtonPressed = false),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 100),
                   transform: Matrix4.translationValues(
@@ -231,16 +307,25 @@ class _UploadScreenState extends State<UploadScreen> {
                     ],
                   ),
                   padding: const EdgeInsets.symmetric(vertical: 18),
-                  child: const Center(
-                    child: Text(
-                      'PUBLISH PIN 🚀',
-                      style: TextStyle(
-                        color: Colors.black,
-                        fontWeight: FontWeight.w900,
-                        fontSize: 16,
-                        letterSpacing: 1.2,
-                      ),
-                    ),
+                  child: Center(
+                    child: _publishing
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.5,
+                              color: Colors.black,
+                            ),
+                          )
+                        : const Text(
+                            'PUBLISH PIN 🚀',
+                            style: TextStyle(
+                              color: Colors.black,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 16,
+                              letterSpacing: 1.2,
+                            ),
+                          ),
                   ),
                 ),
               ),
