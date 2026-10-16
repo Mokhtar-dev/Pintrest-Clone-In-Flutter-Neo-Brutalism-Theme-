@@ -10,11 +10,11 @@ import '../../domain/entities/app_user.dart';
 import '../../domain/entities/pin.dart';
 import '../widgets/neo_feedback.dart';
 import '../widgets/pin_card.dart';
-import 'add_image_screen.dart';
 import 'explore_screen.dart';
 import 'image_details_screen.dart';
 import 'notifications_screen.dart';
 import 'profile_screen.dart';
+import 'upload_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -42,12 +42,23 @@ class _HomeScreenState extends State<HomeScreen> {
     // Populate the showcase drops once on an empty project so the feed keeps
     // the original design look. Safe no-op when pins already exist.
     PinService.instance.seedSamplePinsIfEmpty();
+    // Self-heal a missing profile document (e.g. account created in the
+    // Firebase console) so every screen has operator data to render.
+    _healProfile();
+  }
+
+  Future<void> _healProfile() async {
+    try {
+      await UserService.instance.ensureUserProfile();
+    } catch (_) {
+      // Silent - the profile is re-checked on every action anyway.
+    }
   }
 
   // Fetches the latest profile of the signed in operator before an action so
   // notifications always carry fresh name/avatar data.
   Future<void> _withMe(Future<void> Function(AppUser me) action) async {
-    final me = await UserService.instance.getUser(_uid);
+    final me = await UserService.instance.ensureUserProfile();
     if (me == null) {
       if (mounted) showNeoTip(context, 'PROFILE LINK LOST // RE-AUTHENTICATE');
       return;
@@ -259,13 +270,13 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             _buildNavItem(Icons.home_filled, 'HOME', 0),
             _buildNavItem(Icons.explore_outlined, 'EXPLORE', 1),
-            // Center High-Impact Add Button
+            // Center High-Impact Add Button - opens the URL uplink directly.
             GestureDetector(
               onTap: () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => const AddImageScreen(),
+                    builder: (context) => const UploadScreen(),
                   ),
                 );
               },

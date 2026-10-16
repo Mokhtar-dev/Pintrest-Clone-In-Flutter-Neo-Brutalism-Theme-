@@ -1,7 +1,4 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 
 import '../../../../services/auth_service.dart';
 import '../../../../services/user_service.dart';
@@ -23,7 +20,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   AppUser? _user;
   bool _loading = true;
   bool _saving = false;
-  Uint8List? _avatarBytes;
+  String? _avatarUrlDraft;
   String _pronouns = '';
   String _bio = '';
 
@@ -59,15 +56,84 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     super.dispose();
   }
 
-  Future<void> _pickAvatar() async {
-    final file = await ImagePicker().pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 85,
+  /// URL-based avatar picker: paste a direct image link with live preview.
+  /// No Firebase Storage is used - the app runs on the free Firebase plan.
+  Future<void> _editAvatar() async {
+    final controller = TextEditingController(
+      text: _avatarUrlDraft ?? _user?.avatarUrl ?? '',
     );
-    if (file == null) return;
-    final bytes = await file.readAsBytes();
-    if (!mounted) return;
-    setState(() => _avatarBytes = bytes);
+    await showNeoSheet<void>(
+      context,
+      title: 'AVATAR SOURCE // URL',
+      child: ValueListenableBuilder<TextEditingValue>(
+        valueListenable: controller,
+        builder: (context, value, _) {
+          final preview = value.text.trim();
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: ClipOval(
+                  child: Container(
+                    width: 72,
+                    height: 72,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: const Color(0xFFB6FF00),
+                        width: 2,
+                      ),
+                      color: const Color(0xFF161A18),
+                    ),
+                    child: preview.isNotEmpty
+                        ? Image.network(
+                            preview,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, _, _) => const Icon(
+                              Icons.person_outline_rounded,
+                              color: Colors.white38,
+                              size: 32,
+                            ),
+                          )
+                        : const Icon(
+                            Icons.person_outline_rounded,
+                            color: Colors.white38,
+                            size: 32,
+                          ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              neoTextField(
+                controller: controller,
+                hint: 'https://... direct image link',
+                autofocus: true,
+              ),
+              const SizedBox(height: 12),
+              neoPrimaryButton(
+                label: 'APPLY',
+                onTap: () {
+                  final url = controller.text.trim();
+                  if (url.isNotEmpty &&
+                      !url.startsWith('http://') &&
+                      !url.startsWith('https://')) {
+                    showNeoError(
+                      context,
+                      'ERROR // URL MUST START WITH HTTP(S)://',
+                    );
+                    return;
+                  }
+                  setState(() => _avatarUrlDraft = url);
+                  Navigator.pop(context);
+                },
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    controller.dispose();
   }
 
   Future<void> _save() async {
@@ -94,8 +160,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         }
       }
 
-      if (_avatarBytes != null) {
-        await UserService.instance.uploadAvatar(_uid, _avatarBytes!);
+      if (_avatarUrlDraft != null) {
+        await UserService.instance.updateAvatarUrl(_uid, _avatarUrlDraft!);
       }
       await UserService.instance.updateProfile(
         _uid,
@@ -152,7 +218,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final avatarUrl = _user?.avatarUrl ?? '';
+    final avatarUrl = _avatarUrlDraft ?? _user?.avatarUrl ?? '';
 
     return Scaffold(
       backgroundColor: const Color(0xFF0F1110),
@@ -258,32 +324,27 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               ),
                               color: const Color(0xFF161A18),
                             ),
-                            child: _avatarBytes != null
-                                ? Image.memory(
-                                    _avatarBytes!,
+                            child: avatarUrl.isNotEmpty
+                                ? Image.network(
+                                    avatarUrl,
                                     fit: BoxFit.cover,
+                                    errorBuilder: (_, _, _) =>
+                                        const Icon(
+                                      Icons.person_outline_rounded,
+                                      color: Colors.white38,
+                                      size: 40,
+                                    ),
                                   )
-                                : avatarUrl.isNotEmpty
-                                    ? Image.network(
-                                        avatarUrl,
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (_, _, _) =>
-                                            const Icon(
-                                          Icons.person_outline_rounded,
-                                          color: Colors.white38,
-                                          size: 40,
-                                        ),
-                                      )
-                                    : const Icon(
-                                        Icons.person_outline_rounded,
-                                        color: Colors.white38,
-                                        size: 40,
-                                      ),
+                                : const Icon(
+                                    Icons.person_outline_rounded,
+                                    color: Colors.white38,
+                                    size: 40,
+                                  ),
                           ),
                         ),
                         const SizedBox(height: 10),
                         GestureDetector(
-                          onTap: _pickAvatar,
+                          onTap: _editAvatar,
                           child: Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 14,

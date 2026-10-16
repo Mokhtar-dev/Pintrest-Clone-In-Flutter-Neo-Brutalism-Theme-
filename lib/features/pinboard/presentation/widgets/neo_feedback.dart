@@ -33,6 +33,32 @@ void showNeoTip(BuildContext context, String message) {
     );
 }
 
+/// Error variant of the terminal snackbar (red alert styling).
+void showNeoError(BuildContext context, String message) {
+  ScaffoldMessenger.of(context)
+    ..hideCurrentSnackBar()
+    ..showSnackBar(
+      SnackBar(
+        content: Text(
+          message,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w900,
+            fontSize: 11,
+            letterSpacing: 1.0,
+          ),
+        ),
+        backgroundColor: kNeoRed,
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(12),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+          side: const BorderSide(color: Colors.black, width: 1.5),
+        ),
+      ),
+    );
+}
+
 /// Modal bottom sheet styled with the neo brutalism terminal skin.
 Future<T?> showNeoSheet<T>(
   BuildContext context, {

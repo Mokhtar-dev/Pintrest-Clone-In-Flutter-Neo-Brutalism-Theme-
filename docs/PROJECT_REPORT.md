@@ -2,7 +2,9 @@
 
 > **Project path:** `Desktop/pintrest_clone_in_flutter_neo_brutalism_theme`
 > **Backend:** Firebase project `pin-drop-b2e4d` (already configured via FlutterFire)
-> **Report scope:** what the project was before, everything that was added, how every feature works, the Firestore/Storage data model, security rules, and how to run/deploy it.
+> **Report scope:** what the project was before, everything that was added, how every feature works, the Firestore data model, security rules, and how to run/deploy it.
+>
+> **IMPORTANT — URL-based uploads (free Firebase plan):** The project was later migrated **away from Firebase Storage** (Cloud Storage requires a paid plan). Pins and avatars now reference **direct pasted image URLs** and everything is stored in **Firestore only**. See §4.2 and §5.
 
 ---
 
@@ -16,14 +18,14 @@ After this work, the app is a **complete, working Firebase application**:
 |---|---|
 | Email/password auth (login, register, logout, forgot password, session persistence) | ✅ Wired to FirebaseAuth |
 | Real-time home feed from Firestore | ✅ |
-| Image upload (device gallery → Firebase Storage → Firestore pin) | ✅ |
+| URL-based image drop (paste direct image link → Firestore pin, no Storage needed) | ✅ |
 | Likes, saves (vault), save-to-board, comments, follow | ✅ Full counters + notifications |
 | Real-time notifications with unread badge + mark all read | ✅ |
-| Edit profile (name, handle, bio, pronouns, website, avatar upload) | ✅ Firestore + Storage |
+| Edit profile (name, handle, bio, pronouns, website, avatar URL) | ✅ Firestore only |
 | Profile stats, boards (create/delete/view), saved vault | ✅ |
 | Explore / search screen (was a placeholder) | ✅ New functional screen |
 | Demo content seeding so the designed look is preserved on a fresh DB | ✅ |
-| Firestore + Storage security rules | ✅ `firestore.rules`, `storage.rules` |
+| Firestore security rules | ✅ `firestore.rules` |
 | Visual design of every existing screen | ✅ **Unchanged** (pixel-level) |
 
 **Verification performed:**
@@ -63,7 +65,7 @@ What was mock / dead:
 | `add_image_screen.dart` | Gallery grid of Unsplash URLs, no navigation to upload |
 | `dashboard_screen.dart` | Unused mock screen (left untouched) |
 
-Dependencies already present (used by this work): `firebase_core`, `firebase_auth`, `cloud_firestore`, `firebase_storage`, `image_picker`, `flutter_staggered_grid_view`, `cached_network_image`, `flutter_bloc`, `equatable`.
+Dependencies already present (used by this work): `firebase_core`, `firebase_auth`, `cloud_firestore`, `flutter_staggered_grid_view`, `cached_network_image`, `flutter_bloc`, `equatable`. (`firebase_storage` and `image_picker` were removed during the URL-based upload migration — see §4.2.)
 
 ---
 
@@ -74,8 +76,8 @@ Dependencies already present (used by this work): `firebase_core`, `firebase_aut
 | File | Purpose |
 |---|---|
 | `lib/services/auth_service.dart` | Auth wrapper: sign in/up/out, password reset, username uniqueness, Firestore profile provisioning, friendly error mapping |
-| `lib/services/user_service.dart` | Profile stream/update, avatar upload, follow/unfollow with counters + notifications |
-| `lib/services/pin_service.dart` | Pins CRUD, like/unlike, save to vault, save to board, comments, demo seeding |
+| `lib/services/user_service.dart` | Profile stream/update, avatar URL update, follow/unfollow with counters + notifications |
+| `lib/services/pin_service.dart` | Pins CRUD (URL-based create), like/unlike, save to vault, save to board, comments, demo seeding |
 | `lib/services/notification_service.dart` | Real-time notification feed, unread counter, mark read / mark all read, notification creation |
 | `lib/services/board_service.dart` | Board stream/create/delete, board pin fetching (batched `whereIn`) |
 | `lib/core/utils/formatters.dart` | `formatCount()` (1.4K / 12.4K) and `timeAgo()` (2M AGO / 3D AGO) used by all screens |
@@ -88,7 +90,7 @@ Dependencies already present (used by this work): `firebase_core`, `firebase_aut
 | `lib/features/pinboard/presentation/screens/explore_screen.dart` | Replaces the “EXPLORE DATABASE” placeholder with a working search + filter grid |
 | `lib/features/pinboard/presentation/screens/board_detail_screen.dart` | Opens a board vault and shows its pins |
 | `firestore.rules` | Security rules for the whole data model |
-| `storage.rules` | Security rules for avatars + pin images |
+| `storage.rules` | Legacy file — kept only as reference for a future Storage setup; **not deployed** (the app no longer uses Firebase Storage) |
 
 ### 3.2 Modified files (13)
 
@@ -101,12 +103,13 @@ Dependencies already present (used by this work): `firebase_core`, `firebase_aut
 | `home_screen.dart` | Feed now streams `pins` ordered by newest (limit 100); filter pills actually filter; header bell shows a real unread dot; header avatar shows the real user; cards use the extracted `PinCard`; SAVE saves to vault; heart likes; “more” opens a controls sheet (copy link / delete own drop / report); tap opens details; pull-to-refresh added; seeds demo pins on first run. |
 | `notifications_screen.dart` | Streams `users/{uid}/notifications`; MARK ALL READ works; tapping a notification marks it read and opens the related pin; empty/loading states in the same visual language. |
 | `profile_screen.dart` | Shows the signed-in operator (name, @handle, bio, avatar); PINS/BOARDS/SAVES are real counters; BOARDS tab lists real boards (tap = open, long-press = delete); SAVED tab shows the real saved vault in the same masonry card style; START A BOARD creates a board; share copies the profile link; “more” sheet offers logout (“TERMINATE SESSION”). |
-| `edit_profile_screen.dart` | Loads the real profile; DONE saves to Firestore; EDIT AVATAR picks from gallery and uploads to Storage; PRONOUNS and ABOUT // BIO open styled editor sheets. |
+| `edit_profile_screen.dart` | Loads the real profile; DONE saves to Firestore; EDIT AVATAR opens a styled URL sheet (paste direct image link with live circular preview) and saves `avatarUrl` to Firestore — no Storage; PRONOUNS and ABOUT // BIO open styled editor sheets. |
 | `image_details_screen.dart` | Receives the tapped `Pin`; live-updates likes/saves/comments counters; LIKE toggles; DROP TO BOARD opens a board picker with inline board creation; WRITE NOTE posts a real comment; FOLLOW button is live (FOLLOW/FOLLOWING); author card shows real data; comments stream in as styled cards; share copies a link; REMIX/RAW SVG show honest “locked” tips. |
-| `add_image_screen.dart` | “NEXT (1) →”, “CONTINUE WITH 1 DROP” and the “NEW SHOT” cell now open the real device gallery and forward the asset to `UploadScreen`. |
-| `upload_screen.dart` | Accepts the picked file, previews it from bytes (works on mobile + web), computes the true aspect ratio (`dart:ui` codec), uploads to `pins/{uid}/...jpg` in Storage, writes the pin document, increments `pinsCount`, shows a busy state, then returns to the feed. |
+| `add_image_screen.dart` | **Deleted** — the gallery mock page was removed; the `+` button now opens `UploadScreen` directly. |
+| `upload_screen.dart` | **Rewritten as the “URL UPLINK” terminal** (per the migration guide): an IMAGE SOURCE URL field with debounced live preview, a DROP TITLE field, and a `PUBLISH ✓` action that writes the pin document straight to Firestore with the pasted `imageUrl` (author snapshot, counters = 0, aspect ratio default). No Firebase Storage. **PUBLISH also probes the link (HTTP headers only):** web-page links (`text/html`), blocked links (403/404) and unreachable hosts are rejected with a precise reason, so dead/page links never reach the grid. Scheme-less pastes are auto-prefixed with `https://`. |
+| `lib/core/utils/link_probe*.dart` | New tiny utility (conditional import for web safety) used by the upload screen to check what a pasted link returns before publishing. |
 | `android/app/src/main/AndroidManifest.xml` | Added `<uses-permission android:name="android.permission.INTERNET"/>` (required for release builds to reach Firebase). |
-| `firebase.json` | Added `firestore.rules` + `storage.rules` references so `firebase deploy` works. |
+| `firebase.json` | `firestore.rules` reference kept so `firebase deploy` works; the `storage` section was removed (no Storage in this project). |
 
 ### 3.3 Untouched (intentionally)
 
@@ -125,16 +128,39 @@ Dependencies already present (used by this work): `firebase_core`, `firebase_aut
 5. **Forgot password:** dialog → `sendPasswordResetEmail`.
 6. **Logout:** Profile → “more” sheet → “TERMINATE SESSION” → `signOut()` → `AuthGate` swaps back to `LoginScreen` automatically. No manual navigation anywhere — the gate is the single source of truth.
 7. Errors are mapped to terminal copy (e.g. `ACCESS DENIED // INVALID CREDENTIALS`) in `AuthService.friendlyError`.
+8. **Profile self-healing:** if the `users/{uid}` document is missing (account created directly in the Firebase console, database wiped, or a half-failed registration write), `UserService.ensureUserProfile()` recreates it from the auth account (handle derived from display name/email, zeroed counters, unique-handle check). It runs on Home load and before every action (like/save/publish), so no feature can hit a "NO OPERATOR FOUND" dead end.
 
-### 4.2 Upload pipeline
+### 4.2 Upload pipeline (URL-based — free Firebase plan)
 ```
-Home (+) → AddImageScreen → device gallery (image_picker)
-        → UploadScreen (title + preview + PUBLISH)
-        → Firebase Storage: pins/{uid}/{timestamp}.jpg
-        → Firestore: pins/{doc}  (author snapshot, aspectRatio, counters=0)
+Home (+) → UploadScreen = "NEW DROP // URL UPLINK"   (gallery page removed)
+             • IMAGE SOURCE URL  → auto-prefix https:// when missing
+                                 → debounced live preview (Image.network)
+             • DROP TITLE        → identifier for the drop
+             • PUBLISH ✓         → link probe first (HTTP headers only):
+                                     - text/html      → "THAT IS A WEB PAGE, NOT AN IMAGE"
+                                     - 403/404        → "LINK BLOCKED BY HOST // CODE ..."
+                                     - unreachable    → "NETWORK ERROR // CANNOT REACH <host>"
+                                     - not image/*    → "LINK IS NOT AN IMAGE (...)"
+                                 → direct Firestore write (no Firebase Storage)
+        → Firestore: pins/{doc}  (imageUrl = pasted link, author snapshot,
+                                  aspectRatio = 1.2 default, counters = 0,
+                                  badge LIVE DROP)
         → users/{uid}.pinsCount += 1
         → back to feed (live stream shows it instantly)
 ```
+Why: Cloud Storage requires upgrading the Firebase project to the paid Blaze plan.
+By storing only the pasted URL, the whole app runs on the free **Spark** plan —
+Firestore quotas (reads/writes/storage) are more than enough for this project.
+
+**Why links fail (and how it is handled now):** a link copied from a photo
+*site* (e.g. `unsplash.com/photos/...`, `pinterest.com/pin/...`) is an HTML
+**web page**, not an image — pasting it always failed. Now the preview tells the
+operator to copy the *image address*, and PUBLISH refuses non-image links with
+the exact reason (page / blocked / unreachable / wrong type) instead of writing
+a broken pin. Direct image links (`https://images.unsplash.com/photo-...`,
+`https://i.imgur.com/....jpg`, any link ending `.jpg/.png/.webp`) publish fine.
+Avatars follow the same rule: `users/{uid}.avatarUrl` is patched with a pasted
+link.
 
 ### 4.3 Engagement loop (like / save / comment / follow)
 - **Like** → `pins/{id}/likes/{myUid}` created + `likesCount+1` + notification `LIKE` to author (never to yourself).
@@ -162,7 +188,7 @@ Home (+) → AddImageScreen → device gallery (image_picker)
 
 ---
 
-## 5. Firestore & Storage Data Model
+## 5. Firestore Data Model (Firestore only — no Storage)
 
 ### Collections
 
@@ -179,31 +205,32 @@ users/{uid}/following/{followedId}   → followedAt
 users/{uid}/notifications/{notifId}  → type, actor*, pinId, pinTitle, commentText, read, createdAt
 
 pins/{pinId}
-  title, description, imageUrl, storagePath, aspectRatio
+  title, description, imageUrl (direct link, URL-based upload), aspectRatio
   category, categoryLabel, tags[], badge, badgeColor
   authorId, authorName, authorUsername, authorAvatarUrl
   likesCount, savesCount, commentsCount, createdAt
+  storagePath (legacy field, kept for old documents — always empty in URL mode)
 
 pins/{pinId}/likes/{uid}             → likedAt
 pins/{pinId}/savedBy/{uid}           → savedAt   (dedupe for counters)
 pins/{pinId}/comments/{commentId}    → text, authorId, authorName, authorAvatarUrl, createdAt
 ```
 
-### Storage layout
+### Image hosting (external, free)
 
-```
-avatars/{uid}.jpg          (profile pictures)
-pins/{uid}/{timestamp}.jpg (pin images)
-```
+Images are **not uploaded anywhere by the app**. Both pin images and avatars are
+plain `https://` links pasted by the operator (Unsplash, Imgur, GitHub raw
+links, any public image host). Nothing needs to be provisioned in Firebase —
+this is what keeps the project on the free plan.
 
 ### Security rules (included in the repo)
 - `firestore.rules`: signed-in users read pins/profiles; only owners write profiles, boards, saved vaults and notifications; likes/follows keyed so only the actor can create/delete their own docs; only the author can delete a pin or comment.
-- `storage.rules`: public read; writes only to your own `avatars/{uid}.jpg` or `pins/{uid}/...` with 5/10 MB limits and `image/*` content-type checks.
+- `storage.rules` is **legacy** — kept in the repo as a reference in case Storage is enabled in the future, but it is no longer referenced by `firebase.json` and is not deployed.
 
-**Deploy them (required!):**
+**Deploy the rules (required!):**
 ```bash
 cd pintrest_clone_in_flutter_neo_brutalism_theme
-firebase deploy --only firestore:rules,storage
+firebase deploy --only firestore:rules
 ```
 If your Firebase project still has the temporary “test mode” rules that expire after 30 days, deploying these is what keeps the app working long term.
 
@@ -218,7 +245,9 @@ lib/
 ├── main.dart                      # Firebase init + AuthGate
 ├── firebase_options.dart          # untouched (FlutterFire generated)
 ├── core/
-│   └── utils/formatters.dart      # counts + relative time
+│   └── utils/
+│       ├── formatters.dart        # counts + relative time
+│       └── link_probe.dart        # pre-publish image link verification
 ├── services/                      # ← data layer (new)
 │   ├── auth_service.dart
 │   ├── user_service.dart
@@ -228,7 +257,7 @@ lib/
 └── features/pinboard/
     ├── domain/entities/           # AppUser, Pin, Comment, AppNotification, Board
     └── presentation/
-        ├── screens/               # 13 screens (2 new)
+        ├── screens/               # 12 screens (2 new, gallery page removed)
         └── widgets/               # PinCard, Neo feedback kit, legacy widgets
 ```
 
@@ -247,6 +276,7 @@ The instruction “don’t change the design” was treated strictly:
 - The home feed card was **extracted 1:1** into `PinCard`; the only behavioral states added are: heart turns pink when liked, bookmark icon fills when saved, feed images show a lime spinner while loading (in the same dark card).
 - New surfaces that were unavoidable for functionality (bottom sheets, dialogs, Explore screen, board detail) reuse the exact same design tokens: `#0F1110` background, `#161A18` panels, `#B6FF00` accents, `white24` borders, `w900` uppercase labels.
 - Empty/loading states reuse the original “SYSTEM MODULE INITIALIZING...” placeholder pattern via `NeoEmptyState`.
+- **One deliberate exception:** `UploadScreen` was replaced with the URL-uplink layout supplied in the migration guide (same terminal language: dark `#0F1110` canvas, `#161A18` panels, lime `#B6FF00` accents, `w900` labels), because the original byte-preview layout was incompatible with URL-based uploads. The intermediate gallery page (`add_image_screen.dart`) was then removed on request — the `+` button opens the uplink directly.
 
 ---
 
@@ -260,10 +290,10 @@ flutter pub get
 flutter run
 
 # 3. (One-time) deploy the security rules with the Firebase CLI
-firebase deploy --only firestore:rules,storage
+firebase deploy --only firestore:rules
 ```
 
-**First-run experience:** create an account → the feed seeds the 4 showcase drops → like/save/comment on them, upload your own drop with (+), check the notification bell with a second account to see live notifications arrive.
+**First-run experience:** create an account → the feed seeds the 4 showcase drops → like/save/comment on them, upload your own drop with (+) by pasting any direct image URL, check the notification bell with a second account to see live notifications arrive.
 
 **Builds already verified:**
 - `flutter analyze` → clean
@@ -276,7 +306,8 @@ firebase deploy --only firestore:rules,storage
 
 1. **Apple/Google buttons** are kept for design fidelity but show “OAUTH UPLINK NOT CONFIGURED” — OAuth requires `google_sign_in`/`sign_in_with_apple` setup (SHA fingerprints, Apple developer account) which is outside this task.
 2. **REMIX / RAW SVG / decorative badges** (STAFF SPARK, VIEWING LIVE, ARCHDIGEST.DESIGN) remain styled placeholders by design; they show honest “locked/queued” tips when tapped.
-3. **Deleting a pin** removes the document + Storage file and decrements the counter; deeply nested orphan docs (likes/comments of a deleted pin) are left for simplicity — Cloud Functions/`deleteField` cleanup would be the production answer.
+3. **Deleting a pin** removes the Firestore document and decrements the counter (nothing to clean up in Storage since images are external URLs); deeply nested orphan docs (likes/comments of a deleted pin) are left for simplicity — Cloud Functions/`deleteField` cleanup would be the production answer.
 4. **Boards are private** to the owner in the rules (matches the “SECRET VAULT” copy in the design).
 5. `dashboard_screen.dart` remains unused as it was before; it duplicates Home and was left untouched rather than deleted to avoid removing anything the course might reference.
 6. Seeded showcase pins are attributed to a fictional `PIN/DROP ARCHIVE` profile, so your own stats stay accurate.
+7. **URL-based images depend on the external host.** PUBLISH verifies new links (page / blocked / dead links are rejected with a reason), but a link could still die later — the pin then shows the styled error placeholder. Prefer stable hosts (Unsplash, Imgur, GitHub raw) when uploading.

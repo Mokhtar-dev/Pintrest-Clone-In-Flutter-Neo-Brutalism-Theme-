@@ -1,7 +1,4 @@
-import 'dart:typed_data';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 
 import '../features/pinboard/domain/entities/app_notification.dart';
 import '../features/pinboard/domain/entities/app_user.dart';
@@ -16,7 +13,6 @@ class PinService {
   static final PinService instance = PinService._();
 
   final FirebaseFirestore _db = FirebaseFirestore.instance;
-  final FirebaseStorage _storage = FirebaseStorage.instance;
 
   CollectionReference<Map<String, dynamic>> get _pins => _db.collection('pins');
 
@@ -82,9 +78,10 @@ class PinService {
   // Pin creation
   // ---------------------------------------------------------------------------
 
-  /// Uploads the image to Storage and stores the metadata document.
+  /// Stores the metadata document with a direct [imageUrl] link.
+  /// No Firebase Storage is used - the app runs on the free Firebase plan.
   Future<String> createPin({
-    required Uint8List bytes,
+    required String imageUrl,
     required String title,
     required String description,
     required double aspectRatio,
@@ -92,20 +89,12 @@ class PinService {
     String category = 'ALL',
     String categoryLabel = 'FRESH DROP',
     List<String> tags = const [],
+    String badge = 'FRESH DROP',
   }) async {
-    final timestamp = DateTime.now().millisecondsSinceEpoch;
-    final storagePath = 'pins/${author.uid}/$timestamp.jpg';
-    final storageRef = _storage.ref(storagePath);
-    await storageRef.putData(
-      bytes,
-      SettableMetadata(contentType: 'image/jpeg'),
-    );
-    final imageUrl = await storageRef.getDownloadURL();
-
     final doc = await _pins.add({
       'title': title.trim(),
       'description': description.trim(),
-      'imageUrl': imageUrl,
+      'imageUrl': imageUrl.trim(),
       'category': category,
       'categoryLabel': categoryLabel,
       'tags': tags,
@@ -117,9 +106,9 @@ class PinService {
       'savesCount': 0,
       'commentsCount': 0,
       'aspectRatio': aspectRatio,
-      'badge': 'FRESH DROP',
+      'badge': badge,
       'badgeColor': 0xFFB6FF00,
-      'storagePath': storagePath,
+      'storagePath': '', // Unused for URL mode
       'createdAt': FieldValue.serverTimestamp(),
     });
 
@@ -130,13 +119,6 @@ class PinService {
   }
 
   Future<void> deletePin(Pin pin) async {
-    if (pin.storagePath.isNotEmpty) {
-      try {
-        await _storage.ref(pin.storagePath).delete();
-      } catch (_) {
-        // File may already be gone - keep deleting the document.
-      }
-    }
     await _pins.doc(pin.id).delete();
     if (pin.authorId.isNotEmpty) {
       await _db.collection('users').doc(pin.authorId).update({
