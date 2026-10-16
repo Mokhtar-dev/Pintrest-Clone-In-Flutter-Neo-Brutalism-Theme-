@@ -97,8 +97,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     nameController.dispose();
     if (created != true || name.isEmpty) return;
 
-    await BoardService.instance.createBoard(_uid, name);
-    if (mounted) showNeoTip(context, 'BOARD INITIALIZED // $name');
+    try {
+      await BoardService.instance.createBoard(_uid, name);
+      if (mounted) showNeoTip(context, 'BOARD INITIALIZED // $name');
+    } catch (_) {
+      if (mounted) showNeoError(context, 'BOARD FAULT // RETRY');
+    }
   }
 
   Future<void> _confirmDeleteBoard(Board board) async {

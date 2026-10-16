@@ -181,6 +181,62 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
+  Future<void> _confirmLogout() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: const Color(0xFF161A18),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: kNeoRed, width: 1.5),
+        ),
+        title: const Text(
+          'LOG OUT?',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w900,
+            fontSize: 15,
+            letterSpacing: 1.2,
+          ),
+        ),
+        content: const Text(
+          'END THE SESSION AND RETURN TO THE LOGIN TERMINAL?',
+          style: TextStyle(color: Colors.white54, fontSize: 10),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text(
+              'CANCEL',
+              style: TextStyle(
+                color: Colors.white54,
+                fontWeight: FontWeight.w900,
+                fontSize: 11,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text(
+              'LOG OUT',
+              style: TextStyle(
+                color: kNeoRed,
+                fontWeight: FontWeight.w900,
+                fontSize: 11,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+    // Leave this route first, then end the session - the AuthGate swaps the
+    // whole app back to the login screen automatically.
+    Navigator.of(context).popUntil((route) => route.isFirst);
+    await AuthService.instance.signOut();
+  }
+
   Future<void> _editTextValue({
     required String title,
     required String hint,
@@ -409,6 +465,41 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     'WEBSITE LINK',
                     _websiteController,
                     hint: 'Add a link to drive traffic to your vault',
+                  ),
+                  const SizedBox(height: 32),
+
+                  // 4. Logout - pinned at the bottom of the page.
+                  GestureDetector(
+                    onTap: _confirmLogout,
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF161A18),
+                        border: Border.all(color: kNeoRed, width: 1.5),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.power_settings_new_rounded,
+                            color: kNeoRed,
+                            size: 16,
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            'LOG OUT // TERMINATE SESSION',
+                            style: TextStyle(
+                              color: kNeoRed,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 11,
+                              letterSpacing: 1.0,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ],
               ),

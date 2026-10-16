@@ -14,9 +14,17 @@ service cloud.firestore {
     }
 
     // Operator profiles: everyone signed in can read, only the owner writes.
+    // Demo-scope exception: any signed-in operator may bump ONLY the social
+    // counters on another operator's profile (savesReceived, followersCount)
+    // so that like/save/follow works without Cloud Functions.
     match /users/{uid} {
       allow read: if signedIn();
-      allow create, update: if isOwner(uid);
+      allow create: if isOwner(uid);
+      allow update: if isOwner(uid)
+                    || (signedIn()
+                        && request.resource.data.diff(resource.data)
+                             .affectedKeys()
+                             .hasOnly(['savesReceived', 'followersCount']));
       allow delete: if false;
 
       // Personal SAVED vault - private to the owner.
@@ -29,9 +37,13 @@ service cloud.firestore {
         allow read, write: if isOwner(uid);
       }
 
-      // Live feed notifications - private to the recipient.
+      // Live feed notifications - readable/managed by the recipient; any
+      // signed-in operator may CREATE one for somebody else (like/save/
+      // follow/comment notifications), but never spoof another actor.
       match /notifications/{notificationId} {
-        allow read, write: if isOwner(uid);
+        allow read, update, delete: if isOwner(uid);
+        allow create: if signedIn()
+                      && request.resource.data.actorId == request.auth.uid;
       }
 
       // Follow graph subcollections.

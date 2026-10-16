@@ -45,18 +45,22 @@ class _ImageDetailsScreenState extends State<ImageDetailsScreen> {
   }
 
   Future<void> _toggleLike(Pin pin) async {
-    await _withMe((me) async {
-      final liked = await PinService.instance.toggleLike(
-        pin: pin,
-        uid: me.uid,
-        actorName: me.name,
-        actorUsername: me.username,
-        actorAvatarUrl: me.avatarUrl,
-      );
-      if (mounted) {
-        showNeoTip(context, liked ? 'LIKE REGISTERED' : 'LIKE REVOKED');
-      }
-    });
+    try {
+      await _withMe((me) async {
+        final liked = await PinService.instance.toggleLike(
+          pin: pin,
+          uid: me.uid,
+          actorName: me.name,
+          actorUsername: me.username,
+          actorAvatarUrl: me.avatarUrl,
+        );
+        if (mounted) {
+          showNeoTip(context, liked ? 'LIKE REGISTERED' : 'LIKE REVOKED');
+        }
+      });
+    } catch (_) {
+      if (mounted) showNeoError(context, 'LIKE FAILED // RETRY IN A MOMENT');
+    }
   }
 
   Future<void> _toggleFollow(Pin pin) async {
@@ -64,18 +68,22 @@ class _ImageDetailsScreenState extends State<ImageDetailsScreen> {
       showNeoTip(context, 'THIS IS YOUR OWN DROP // SELF-FOLLOW BLOCKED');
       return;
     }
-    await _withMe((me) async {
-      final following = await UserService.instance.toggleFollow(
-        myUid: me.uid,
-        myName: me.name,
-        myUsername: me.username,
-        myAvatarUrl: me.avatarUrl,
-        targetUid: pin.authorId,
-      );
-      if (mounted) {
-        showNeoTip(context, following ? 'FOLLOWING ${pin.authorUsername.toUpperCase()}' : 'UNFOLLOWED');
-      }
-    });
+    try {
+      await _withMe((me) async {
+        final following = await UserService.instance.toggleFollow(
+          myUid: me.uid,
+          myName: me.name,
+          myUsername: me.username,
+          myAvatarUrl: me.avatarUrl,
+          targetUid: pin.authorId,
+        );
+        if (mounted) {
+          showNeoTip(context, following ? 'FOLLOWING ${pin.authorUsername.toUpperCase()}' : 'UNFOLLOWED');
+        }
+      });
+    } catch (_) {
+      if (mounted) showNeoError(context, 'FOLLOW FAILED // RETRY IN A MOMENT');
+    }
   }
 
   Future<void> _openSaveSheet(Pin pin) async {
@@ -814,21 +822,25 @@ class _SaveToBoardSheetState extends State<_SaveToBoardSheet> {
     required String boardId,
     required String boardName,
   }) async {
-    final saved = await PinService.instance.savePinToBoard(
-      pin: widget.pin,
-      uid: me.uid,
-      boardId: boardId,
-      boardName: boardName,
-      actorName: me.name,
-      actorUsername: me.username,
-      actorAvatarUrl: me.avatarUrl,
-    );
-    if (!mounted) return;
-    Navigator.pop(context);
-    showNeoTip(
-      context,
-      saved ? 'DROPPED TO $boardName' : 'ALREADY ROUTED TO $boardName',
-    );
+    try {
+      final saved = await PinService.instance.savePinToBoard(
+        pin: widget.pin,
+        uid: me.uid,
+        boardId: boardId,
+        boardName: boardName,
+        actorName: me.name,
+        actorUsername: me.username,
+        actorAvatarUrl: me.avatarUrl,
+      );
+      if (!mounted) return;
+      Navigator.pop(context);
+      showNeoTip(
+        context,
+        saved ? 'DROPPED TO $boardName' : 'ALREADY ROUTED TO $boardName',
+      );
+    } catch (_) {
+      if (mounted) showNeoError(context, 'BOARD SAVE FAILED // RETRY');
+    }
   }
 
   Future<void> _createAndSave() async {
@@ -886,7 +898,7 @@ class _SaveToBoardSheetState extends State<_SaveToBoardSheet> {
     nameController.dispose();
     if (created != true || name.isEmpty || !mounted) return;
 
-    final me = await UserService.instance.getUser(_uid);
+    final me = await UserService.instance.ensureUserProfile();
     if (me == null || !mounted) return;
     final boardId = await BoardService.instance.createBoard(me.uid, name);
     if (!mounted) return;

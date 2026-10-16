@@ -58,17 +58,22 @@ class NotificationService {
     String commentText = '',
   }) async {
     if (recipientId.isEmpty || recipientId == actorId) return;
-    await _feed(recipientId).add({
-      'type': type,
-      'actorId': actorId,
-      'actorName': actorName,
-      'actorUsername': actorUsername,
-      'actorAvatarUrl': actorAvatarUrl,
-      'pinId': pinId,
-      'pinTitle': pinTitle,
-      'commentText': commentText,
-      'read': false,
-      'createdAt': FieldValue.serverTimestamp(),
-    });
+    try {
+      await _feed(recipientId).add({
+        'type': type,
+        'actorId': actorId,
+        'actorName': actorName,
+        'actorUsername': actorUsername,
+        'actorAvatarUrl': actorAvatarUrl,
+        'pinId': pinId,
+        'pinTitle': pinTitle,
+        'commentText': commentText,
+        'read': false,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    } catch (_) {
+      // Notifications are secondary: a failure here must never break the
+      // main action (like / save / follow / comment already committed).
+    }
   }
 }

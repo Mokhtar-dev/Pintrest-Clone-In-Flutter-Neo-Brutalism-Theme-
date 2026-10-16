@@ -67,36 +67,44 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _toggleLike(Pin pin) async {
-    await _withMe((me) async {
-      final liked = await PinService.instance.toggleLike(
-        pin: pin,
-        uid: me.uid,
-        actorName: me.name,
-        actorUsername: me.username,
-        actorAvatarUrl: me.avatarUrl,
-      );
-      if (mounted && liked) {
-        showNeoTip(context, 'LIKE REGISTERED // ${pin.title}');
-      }
-    });
+    try {
+      await _withMe((me) async {
+        final liked = await PinService.instance.toggleLike(
+          pin: pin,
+          uid: me.uid,
+          actorName: me.name,
+          actorUsername: me.username,
+          actorAvatarUrl: me.avatarUrl,
+        );
+        if (mounted && liked) {
+          showNeoTip(context, 'LIKE REGISTERED // ${pin.title}');
+        }
+      });
+    } catch (_) {
+      if (mounted) showNeoError(context, 'LIKE FAILED // RETRY IN A MOMENT');
+    }
   }
 
   Future<void> _savePin(Pin pin) async {
-    await _withMe((me) async {
-      final saved = await PinService.instance.savePinToSaved(
-        pin: pin,
-        uid: me.uid,
-        actorName: me.name,
-        actorUsername: me.username,
-        actorAvatarUrl: me.avatarUrl,
-      );
-      if (mounted) {
-        showNeoTip(
-          context,
-          saved ? 'DROPPED TO SAVED VAULT' : 'ALREADY IN SAVED VAULT',
+    try {
+      await _withMe((me) async {
+        final saved = await PinService.instance.savePinToSaved(
+          pin: pin,
+          uid: me.uid,
+          actorName: me.name,
+          actorUsername: me.username,
+          actorAvatarUrl: me.avatarUrl,
         );
-      }
-    });
+        if (mounted) {
+          showNeoTip(
+            context,
+            saved ? 'DROPPED TO SAVED VAULT' : 'ALREADY IN SAVED VAULT',
+          );
+        }
+      });
+    } catch (_) {
+      if (mounted) showNeoError(context, 'SAVE FAILED // RETRY IN A MOMENT');
+    }
   }
 
   void _showPinOptions(Pin pin) {
@@ -544,7 +552,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     itemCount: pins.length,
                     itemBuilder: (context, index) {
                       final pin = pins[index];
-                      return PinCard(
+                      return _LivePinCard(
                         pin: pin,
                         onTap: () {
                           Navigator.push(
@@ -621,6 +629,50 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Feed card wired to the live like/saved state of the signed-in operator, so
+/// the heart and bookmark fill (and unfill) in real time on the home feed.
+class _LivePinCard extends StatelessWidget {
+  final Pin pin;
+  final VoidCallback onTap;
+  final VoidCallback onSave;
+  final VoidCallback onLike;
+  final VoidCallback onMore;
+
+  const _LivePinCard({
+    required this.pin,
+    required this.onTap,
+    required this.onSave,
+    required this.onLike,
+    required this.onMore,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final uid = AuthService.instance.currentUid;
+    return StreamBuilder<bool>(
+      stream: PinService.instance.streamIsLiked(pin.id, uid),
+      initialData: false,
+      builder: (context, likeSnapshot) {
+        return StreamBuilder<bool>(
+          stream: PinService.instance.streamIsSaved(uid, pin.id),
+          initialData: false,
+          builder: (context, saveSnapshot) {
+            return PinCard(
+              pin: pin,
+              onTap: onTap,
+              onSave: onSave,
+              onLike: onLike,
+              onMore: onMore,
+              isLiked: likeSnapshot.data ?? false,
+              isSaved: saveSnapshot.data ?? false,
+            );
+          },
+        );
+      },
     );
   }
 }
