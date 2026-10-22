@@ -49,11 +49,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     setState(() => _isLoading = true);
     try {
-      final taken = await AuthService.instance.isUsernameTaken(username);
-      if (taken) {
-        if (mounted) showNeoTip(context, 'HANDLE TAKEN // CHOOSE ANOTHER');
-        return;
-      }
+      // NOTE: the handle uniqueness check happens inside signUp(), as a
+      // signed-in user - profile reads are protected by Firestore rules.
       await AuthService.instance.signUp(
         username: username,
         email: email,

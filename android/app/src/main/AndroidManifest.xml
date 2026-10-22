@@ -2,7 +2,7 @@
     <!-- Required for Firebase (Auth, Firestore, Storage) and image loading -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <application
-        android:label="pintrest_clone_in_flutter_neo_brutalism_theme"
+        android:label="PinDrop"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

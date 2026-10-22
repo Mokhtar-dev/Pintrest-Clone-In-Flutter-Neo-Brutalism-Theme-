@@ -1,6 +1,14 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+/// Thrown when the requested handle already belongs to another operator.
+class UsernameTakenException implements Exception {
+  const UsernameTakenException();
+
+  @override
+  String toString() => 'Username already taken';
+}
+
 /// Thin wrapper around FirebaseAuth that also provisions the Firestore
 /// profile document (`users/{uid}`) on registration.
 class AuthService {
@@ -23,6 +31,12 @@ class AuthService {
   }
 
   /// Creates the auth account and the matching Firestore operator profile.
+  ///
+  /// The handle uniqueness check runs AFTER the auth account is created, so it
+  /// happens as a signed-in user (the security rules only allow profile reads
+  /// to authenticated users). If the handle is taken or the profile write
+  /// fails, the fresh auth account is deleted again so the email stays free
+  /// for another attempt.
   Future<UserCredential> signUp({
     required String username,
     required String email,
@@ -35,23 +49,34 @@ class AuthService {
     final user = credential.user!;
     final handle = normalizeUsername(username);
 
-    await _db.collection('users').doc(user.uid).set({
-      'name': handle,
-      'username': handle,
-      'email': email.trim(),
-      'bio': '',
-      'pronouns': '',
-      'website': '',
-      'avatarUrl': 'https://i.pravatar.cc/200?img=12',
-      'pinsCount': 0,
-      'boardsCount': 0,
-      'savesReceived': 0,
-      'followersCount': 0,
-      'followingCount': 0,
-      'createdAt': FieldValue.serverTimestamp(),
-    });
-    await user.updateDisplayName(handle);
-    return credential;
+    try {
+      if (await isUsernameTaken(handle)) {
+        throw const UsernameTakenException();
+      }
+      await _db.collection('users').doc(user.uid).set({
+        'name': handle,
+        'username': handle,
+        'email': email.trim(),
+        'bio': '',
+        'pronouns': '',
+        'website': '',
+        'avatarUrl': 'https://i.pravatar.cc/200?img=12',
+        'pinsCount': 0,
+        'boardsCount': 0,
+        'savesReceived': 0,
+        'followersCount': 0,
+        'followingCount': 0,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      await user.updateDisplayName(handle);
+      return credential;
+    } catch (_) {
+      // Roll back the half-created account (best effort).
+      try {
+        await user.delete();
+      } catch (_) {}
+      rethrow;
+    }
   }
 
   Future<bool> isUsernameTaken(String username) async {
@@ -76,6 +101,9 @@ class AuthService {
 
   /// Maps FirebaseAuth error codes to the terminal style copy used by the UI.
   static String friendlyError(Object error) {
+    if (error is UsernameTakenException) {
+      return 'HANDLE TAKEN // CHOOSE ANOTHER';
+    }
     if (error is FirebaseAuthException) {
       switch (error.code) {
         case 'invalid-email':
@@ -97,6 +125,9 @@ class AuthService {
         default:
           return 'AUTH FAULT: ${error.code.toUpperCase()}';
       }
+    }
+    if (error is FirebaseException && error.code == 'permission-denied') {
+      return 'ACCESS DENIED // FIRESTORE RULES BLOCKED THIS ACTION';
     }
     return 'UNEXPECTED FAULT // RETRY';
   }

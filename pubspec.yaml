@@ -55,6 +55,16 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  flutter_launcher_icons: ^0.13.1  # Package dependency
+  flutter_lints: ^6.0.0
+
+# The configuration block MUST be at the root level (not inside dev_dependencies)
+flutter_launcher_icons:
+  image_path: "lib/assets/icon.jpg" # Uses forward slashes
+  android: true
+  ios: true
+  remove_alpha_ios: true
+  background_color: "#0F1110"
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is

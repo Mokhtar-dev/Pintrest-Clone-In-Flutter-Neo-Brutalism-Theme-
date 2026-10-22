@@ -123,7 +123,7 @@ Dependencies already present (used by this work): `firebase_core`, `firebase_aut
 ### 4.1 Authentication flow
 1. App starts → `Firebase.initializeApp` → `AuthGate`.
 2. `AuthGate` listens to `FirebaseAuth.instance.authStateChanges()` (persists session across restarts automatically).
-3. **Register:** validates handle/email/password → checks `users` for a duplicate handle → `createUserWithEmailAndPassword` → writes `users/{uid}` profile doc with zeroed counters → returns to root.
+3. **Register:** validates handle/email/password → `createUserWithEmailAndPassword` → checks handle uniqueness as the now-signed-in user (the rules only allow profile reads to authenticated operators, so the pre-auth check is gone) → writes `users/{uid}` profile doc with zeroed counters → returns to root. If the handle is taken or the profile write fails, the fresh auth account is deleted again so the email stays free for a retry.
 4. **Login:** `signInWithEmailAndPassword` → `AuthGate` swaps to `HomeScreen`.
 5. **Forgot password:** dialog → `sendPasswordResetEmail`.
 6. **Logout:** Profile → “more” sheet → “TERMINATE SESSION”, or Edit Profile → red `LOG OUT` button at the bottom of the page (with a confirm dialog) → `signOut()` → `AuthGate` swaps back to `LoginScreen` automatically. No manual navigation anywhere — the gate is the single source of truth.
